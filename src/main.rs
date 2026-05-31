@@ -1,3 +1,3 @@
 fn main() {
-    println!("Welcome to my jira clone");
+    println!("Welcome to my issue tracker cli");
 }

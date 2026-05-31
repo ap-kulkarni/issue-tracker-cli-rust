@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "jira_clone"
+name = "issue_tracker_cli"
 version = "0.1.0"
