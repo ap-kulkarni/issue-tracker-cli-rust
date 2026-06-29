@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::u32;
 
 use anyhow::Result;
 use anyhow::anyhow;
@@ -10,10 +11,13 @@ use crate::models::Action;
 mod page_helpers;
 use page_helpers::get_column_string;
 
-const ID_WIDTH: usize = 2;
-const NAME_WIDTH: usize = 16;
-const STATUS_WIDTH: usize = 16;
-const DESCRIPTION_WIDTH: usize = 32;
+const LIST_PAGE_ID_WIDTH: usize = 11;
+const DETAILS_PAGE_ID_WIDTH: usize = 5;
+const LIST_PAGE_NAME_WIDTH: usize = 32;
+const DETAILS_PAGE_NAME_WIDTH: usize = 12;
+const LIST_PAGE_STATUS_WIDTH: usize = 17;
+const DETAILS_PAGE_STATUS_WIDTH: usize = 13;
+const DESCRIPTION_WIDTH: usize = 27;
 
 pub trait Page {
     fn draw_page(&self) -> Result<()>;
@@ -28,17 +32,14 @@ impl Page for HomePage {
         println!("----------------------------- EPICS -----------------------------");
         println!("     id     |               name               |      status      ");
 
-        // TODO: print out epics using get_column_string(). also make sure the epics are sorted by id
-        let parsed = self.db.read_db()?;
-        for key in parsed.epics.keys().sorted() {
-            if let Some(epic) = parsed.epics.get(key) {
-                println!(
-                    "{} | {} | {}",
-                    get_column_string(key.to_string().as_str(), ID_WIDTH),
-                    get_column_string(epic.name.as_str(), NAME_WIDTH),
-                    get_column_string(epic.status.to_string().as_str(), STATUS_WIDTH)
-                );
-            }
+        let epics = self.db.read_db()?.epics;
+        for key in epics.keys().sorted() {
+            let epic = &epics[&key];
+            let id = get_column_string(key.to_string().as_str(), LIST_PAGE_ID_WIDTH);
+            let name = get_column_string(epic.name.as_str(), LIST_PAGE_NAME_WIDTH);
+            let status =
+                get_column_string(epic.status.to_string().as_str(), LIST_PAGE_STATUS_WIDTH);
+            println!("{} | {} | {}", id, name, status);
         }
         println!();
         println!();
@@ -49,20 +50,18 @@ impl Page for HomePage {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        //todo!() // match against the user input and return the corresponding action. If the user input was invalid return None.
+        let epics = self.db.read_db()?.epics;
         match input {
-            i if i == "q" => Ok(Some(Action::Exit)),
-            i if i == "c" => Ok(Some(Action::CreateEpic)),
-            i if i.len() > 0 && i.chars().all(|c| char::is_numeric(c)) => {
-                let epic_id = u32::from_str_radix(input, 10)?;
-                let parsed = self.db.read_db()?;
-                if let Some(_) = parsed.epics.get(&epic_id) {
-                    Ok(Some(Action::NavigateToEpicDetail { epic_id: (epic_id) }))
-                } else {
-                    Ok(None)
+            "q" => Ok(Some(Action::Exit)),
+            "c" => Ok(Some(Action::CreateEpic)),
+            input => {
+                if let Ok(epic_id) = input.parse::<u32>() {
+                    if epics.contains_key(&epic_id) {
+                        return Ok(Some(Action::NavigateToEpicDetail { epic_id }));
+                    }
                 }
+                Ok(None)
             }
-            _ => Ok(None),
         }
     }
 }
@@ -86,10 +85,10 @@ impl Page for EpicDetail {
         // TODO: print out epic details using get_column_string()
         println!(
             "{} | {} | {} | {}",
-            get_column_string(self.epic_id.to_string().as_str(), ID_WIDTH),
-            get_column_string(epic.name.as_str(), NAME_WIDTH),
+            get_column_string(self.epic_id.to_string().as_str(), DETAILS_PAGE_ID_WIDTH),
+            get_column_string(epic.name.as_str(), DETAILS_PAGE_NAME_WIDTH),
             get_column_string(epic.description.as_str(), DESCRIPTION_WIDTH),
-            get_column_string(epic.status.to_string().as_str(), STATUS_WIDTH)
+            get_column_string(epic.status.to_string().as_str(), DETAILS_PAGE_STATUS_WIDTH)
         );
 
         println!();
@@ -99,16 +98,13 @@ impl Page for EpicDetail {
 
         let stories = &db_state.stories;
 
-        // TODO: print out stories using get_column_string(). also make sure the stories are sorted by id
         for key in stories.keys().sorted() {
-            if let Some(story) = stories.get(&key) {
-                println!(
-                    "{} | {} | {}",
-                    get_column_string(key.to_string().as_str(), ID_WIDTH),
-                    get_column_string(story.name.as_str(), NAME_WIDTH),
-                    get_column_string(story.status.to_string().as_str(), STATUS_WIDTH)
-                );
-            }
+            let story = &stories[&key];
+            let id = get_column_string(key.to_string().as_str(), LIST_PAGE_ID_WIDTH);
+            let name = get_column_string(story.name.as_str(), LIST_PAGE_NAME_WIDTH);
+            let status =
+                get_column_string(story.status.to_string().as_str(), LIST_PAGE_STATUS_WIDTH);
+            println!("{} | {} | {}", id, name, status);
         }
 
         println!();
@@ -122,33 +118,29 @@ impl Page for EpicDetail {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        //todo!() // match against the user input and return the corresponding action. If the user input was invalid return None.
+        let stories = self.db.read_db()?.stories;
         match input {
-            i if i == "p" => Ok(Some(Action::NavigateToPreviousPage)),
-            i if i == "u" => Ok(Some(Action::UpdateEpicStatus {
+            "p" => Ok(Some(Action::NavigateToPreviousPage)),
+            "u" => Ok(Some(Action::UpdateEpicStatus {
                 epic_id: self.epic_id,
             })),
-            i if i == "d" => Ok(Some(Action::DeleteEpic {
+            "d" => Ok(Some(Action::DeleteEpic {
                 epic_id: self.epic_id,
             })),
-            i if i == "c" => Ok(Some(Action::CreateStory {
+            "c" => Ok(Some(Action::CreateStory {
                 epic_id: self.epic_id,
             })),
-            i if i.len() > 0 && i.chars().all(|c| char::is_numeric(c)) => {
-                let story_id = u32::from_str_radix(input, 10)?;
-                let parsed = self.db.read_db()?;
-                if let Some(_) = parsed.epics.get(&self.epic_id)
-                    && let Some(_) = parsed.stories.get(&story_id)
-                {
-                    Ok(Some(Action::NavigateToStoryDetail {
-                        epic_id: self.epic_id,
-                        story_id,
-                    }))
-                } else {
-                    Ok(None)
+            input => {
+                if let Ok(story_id) = input.parse::<u32>() {
+                    if stories.contains_key(&story_id) {
+                        return Ok(Some(Action::NavigateToStoryDetail {
+                            epic_id: self.epic_id,
+                            story_id,
+                        }));
+                    }
                 }
+                Ok(None)
             }
-            _ => Ok(None),
         }
     }
 }
@@ -161,23 +153,20 @@ pub struct StoryDetail {
 
 impl Page for StoryDetail {
     fn draw_page(&self) -> Result<()> {
-        let db_state = self.db.read_db()?;
-        let story = db_state
-            .stories
+        let stories = self.db.read_db()?.stories;
+        let story = stories
             .get(&self.story_id)
             .ok_or_else(|| anyhow!("could not find story!"))?;
 
         println!("------------------------------ STORY ------------------------------");
         println!("  id  |     name     |         description         |    status    ");
 
-        // TODO: print out story details using get_column_string()
-        println!(
-            "{} | {} | {} | {}",
-            get_column_string(self.story_id.to_string().as_str(), ID_WIDTH),
-            get_column_string(story.name.as_str(), NAME_WIDTH),
-            get_column_string(story.description.as_str(), DESCRIPTION_WIDTH),
-            get_column_string(story.status.to_string().as_str(), STATUS_WIDTH)
-        );
+        let id = get_column_string(self.story_id.to_string().as_str(), DETAILS_PAGE_ID_WIDTH);
+        let name = get_column_string(story.name.as_str(), LIST_PAGE_NAME_WIDTH);
+        let description = get_column_string(story.description.as_str(), DESCRIPTION_WIDTH);
+        let status = get_column_string(story.status.to_string().as_str(), LIST_PAGE_STATUS_WIDTH);
+        println!("{} | {} | {} | {}", id, name, description, status);
+
         println!();
         println!();
 
@@ -187,13 +176,12 @@ impl Page for StoryDetail {
     }
 
     fn handle_input(&self, input: &str) -> Result<Option<Action>> {
-        // match against the user input and return the corresponding action. If the user input was invalid return None.
         match input {
-            i if i == "p" => Ok(Some(Action::NavigateToPreviousPage)),
-            i if i == "u" => Ok(Some(Action::UpdateStoryStatus {
+            "p" => Ok(Some(Action::NavigateToPreviousPage)),
+            "u" => Ok(Some(Action::UpdateStoryStatus {
                 story_id: self.story_id,
             })),
-            i if i == "d" => Ok(Some(Action::DeleteStory {
+            "d" => Ok(Some(Action::DeleteStory {
                 epic_id: self.epic_id,
                 story_id: self.story_id,
             })),

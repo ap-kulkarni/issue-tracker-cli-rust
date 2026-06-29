@@ -1,25 +1,27 @@
 use ellipse::Ellipse;
 
 pub fn get_column_string(text: &str, width: usize) -> String {
-    //todo!(); // use the truncate_ellipse function from the ellipse crate
-    if width <= 3 {
-        let mut ellipsized_text = "".to_string();
-        for _ in 0..width {
-            ellipsized_text.push('.');
+    let len = text.len();
+    match width.cmp(&len) {
+        std::cmp::Ordering::Equal => return text.to_string(),
+        std::cmp::Ordering::Greater => {
+            let mut ellipsized_text = text.to_string();
+            for _ in 0..width - text.len() {
+                ellipsized_text.push(' ');
+            }
+            return ellipsized_text;
         }
-        return ellipsized_text;
-    }
-    if width > text.len() {
-        let mut ellipsized_text = text.to_string();
-        for _ in 0..width - text.len() {
-            ellipsized_text.push(' ');
+        std::cmp::Ordering::Less => {
+            if width <= 3 {
+                let mut ellipsized_text = "".to_string();
+                for _ in 0..width {
+                    ellipsized_text.push('.');
+                }
+                return ellipsized_text;
+            }
+            return text.truncate_ellipse(width - 3).to_string();
         }
-        return ellipsized_text;
     }
-    if width == text.len() {
-        return text.to_string();
-    }
-    return text.truncate_ellipse(width - 3).to_string();
 }
 
 #[cfg(test)]
